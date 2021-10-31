@@ -1,0 +1,90 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+
+	"github.com/go-chi/chi"
+
+	"github.com/yaggytter/auditlog-sample-gorm-echo/auditlog"
+
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+)
+
+func main() {
+	r := newRouter()
+	http.ListenAndServe(":8080", r)
+}
+
+func newRouter() *chi.Mux {
+	connectDB()
+
+	r := chi.NewRouter()
+	r.Use(authMiddleware)
+
+	r.Get("/logtest", logtest)
+	return r
+}
+
+func authMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// いろいろ認可の処理をしたあと
+		fmt.Println("auth ok!")
+		// 例えばユーザ名を入れる
+		username := "User1"
+		// コンテキストにユーザ名を入れる
+		ctx := context.WithValue(r.Context(), "UserName", username)
+
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// DB
+type user struct {
+	Id           int    `json:"id" param:"id"`
+	Name         string `json:"name"`
+	Email        string `json:"email"`
+	Secret       string `json:"secret"`
+	Personalinfo string `json:"personalinfo"`
+}
+
+var db *gorm.DB
+
+func connectDB() {
+	user := "mysqluser"
+	password := "mysqlpass"
+	host := "db"
+	port := "3306"
+	database_name := "auditlogtest"
+
+	var err error
+	dsn := user + ":" + password + "@tcp(" + host + ":" + port + ")/" + database_name + "?charset=utf8mb4"
+	db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{
+		Logger: auditlog.Default.LogMode(logger.Info), // for Audit logs
+	})
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+}
+
+func logtest(w http.ResponseWriter, r *http.Request) {
+	sqlDB, _ := db.DB()
+	defer sqlDB.Close()
+	err := sqlDB.Ping()
+
+	users := []user{}
+	db.Find(&users)
+	fmt.Printf("%v\n", users)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	res, err := json.Marshal(users)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(res)
+}
