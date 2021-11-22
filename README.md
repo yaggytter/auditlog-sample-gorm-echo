@@ -42,7 +42,7 @@ main.go
 	ctxdb := db.WithContext(c.Request().Context())
 ```
 
-- After that, You can view the log as shown below.
+- Now, You can view the log as shown below.
 
 ```
 2021/11/09 05:08:08 [AUDIT] user='ee04243e-a635-4bbd-9788-e2d5483efa96' /app/infrastructure/postgres/user.go:416 [4.140ms] [rows:6] SELECT * FROM "skills" WHERE "skills"."user_id" = 182 AND "skills"."deleted_at" IS NULL
